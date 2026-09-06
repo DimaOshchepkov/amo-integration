@@ -4,6 +4,8 @@ namespace App\Actions;
 
 use AmoCRM\Collections\ContactsCollection;
 use AmoCRM\Collections\CustomFieldsValuesCollection;
+use AmoCRM\Exceptions\AmoCRMMissedTokenException;
+use AmoCRM\Exceptions\InvalidArgumentException;
 use AmoCRM\Models\ContactModel;
 use AmoCRM\Models\CustomFieldsValues\CheckboxCustomFieldValuesModel;
 use AmoCRM\Models\CustomFieldsValues\MultitextCustomFieldValuesModel;
@@ -17,16 +19,18 @@ use App\Http\Requests\StoreLeadRequest;
 use App\Services\AmoCrm\AmoCrmService;
 use Illuminate\Support\Facades\Log;
 
-class CreateAmoLead
+readonly class CreateAmoLead
 {
     public function __construct(
-        private readonly AmoCrmService $amoCrm,
+        private AmoCrmService $amoCrm,
     ) {}
 
     /**
      * Создаёт сделку из заявки формы с прикреплённым контактом.
      *
      * @throws AmoCrmNotAuthorizedException
+     * @throws AmoCRMMissedTokenException
+     * @throws InvalidArgumentException
      */
     public function handle(StoreLeadRequest $request): LeadModel
     {
@@ -57,22 +61,8 @@ class CreateAmoLead
             ->setName((string) $request->string('name'))
             ->setCustomFieldsValues(
                 (new CustomFieldsValuesCollection)
-                    ->add(
-                        (new MultitextCustomFieldValuesModel)
-                            ->setFieldCode('EMAIL')
-                            ->setValues(
-                                (new MultitextCustomFieldValueCollection)
-                                    ->add((new MultitextCustomFieldValueModel)->setValue((string) $request->string('email')))
-                            )
-                    )
-                    ->add(
-                        (new MultitextCustomFieldValuesModel)
-                            ->setFieldCode('PHONE')
-                            ->setValues(
-                                (new MultitextCustomFieldValueCollection)
-                                    ->add((new MultitextCustomFieldValueModel)->setValue((string) $request->string('phone')))
-                            )
-                    )
+                    ->add($this->multitextField('EMAIL', (string) $request->string('email')))
+                    ->add($this->multitextField('PHONE', (string) $request->string('phone')))
             );
 
         $lead->setContacts((new ContactsCollection)->add($contact));
@@ -85,5 +75,21 @@ class CreateAmoLead
         ]);
 
         return $createdLead;
+    }
+
+    /**
+     * Встроенное поле контакта (PHONE/EMAIL) — multitext по field_code.
+     */
+    private function multitextField(string $fieldCode, string $value): MultitextCustomFieldValuesModel
+    {
+        $field = new MultitextCustomFieldValuesModel;
+
+        $field->setFieldCode($fieldCode);
+        $field->setValues(
+            (new MultitextCustomFieldValueCollection)
+                ->add((new MultitextCustomFieldValueModel)->setValue($value))
+        );
+
+        return $field;
     }
 }

@@ -2,18 +2,6 @@
 
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Third Party Services
-    |--------------------------------------------------------------------------
-    |
-    | This file is for storing the credentials for third party services such
-    | as Resend, Postmark, AWS, and more. This file provides the de facto
-    | location for this type of information, allowing packages to have
-    | a conventional file to locate the various service credentials.
-    |
-    */
-
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
@@ -40,7 +28,6 @@ return [
         'client_secret' => env('AMOCRM_CLIENT_SECRET'),
         'redirect_uri' => env('AMOCRM_REDIRECT_URI'),
         'subdomain' => env('AMOCRM_SUBDOMAIN'),
-        // ID чекбокс-поля на сделках «Провёл на сайте >30 сек» (создаётся вручную в amoCRM)
         'lead_30s_field_id' => env('AMOCRM_LEAD_30S_FIELD_ID'),
     ],
 

@@ -8,12 +8,6 @@ Route::inertia('/', 'welcome')->name('home');
 
 Route::post('/lead', [LeadController::class, 'store'])->name('lead.store');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
-});
-
 Route::get('/amocrm/connect', [AmoCrmOAuthController::class, 'connect'])->name('amocrm.connect');
 
 Route::get('/amocrm/callback', [AmoCrmOAuthController::class, 'handleRedirectCallback'])->name('amocrm.callback');
-
-require __DIR__.'/settings.php';

@@ -66,6 +66,9 @@ class AmoCrmOAuthService implements OAuthServiceInterface
     /**
      * Завершает OAuth-колбэк: проверяет state, обменивает код на токен,
      * сохраняет токен и возвращает владельца аккаунта.
+     * @throws AuthorizationCodeMissingException
+     * @throws TokenExchangeException
+     * @throws InvalidOAuthStateException
      */
     public function completeCallback(
         ?string $code,
@@ -94,6 +97,9 @@ class AmoCrmOAuthService implements OAuthServiceInterface
         return $owner;
     }
 
+    /**
+     * @throws TokenExchangeException
+     */
     private function exchangeCodeForToken(string $code, ?string $referer): AccessTokenInterface
     {
         $baseDomain = $referer

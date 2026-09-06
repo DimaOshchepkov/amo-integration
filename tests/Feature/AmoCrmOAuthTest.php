@@ -64,3 +64,22 @@ test('redirect callback without code redirects home with error flash', function 
     $response->assertRedirect(route('home'));
     $response->assertSessionHas('error', 'Код авторизации не получен');
 });
+
+test('redirect callback with unexpected error redirects home with generic error flash', function () {
+    $oauthClient = Mockery::mock(AmoCRMOAuth::class);
+    $oauthClient->shouldReceive('getAccessTokenByCode')
+        ->once()
+        ->with('test-code')
+        ->andReturn(validAccessToken());
+    $oauthClient->shouldReceive('getResourceOwner')
+        ->once()
+        ->andThrow(new Exception('network down'));
+
+    $this->instance(AmoCRMOAuth::class, $oauthClient);
+
+    $response = $this->withSession(['oauth2state' => 'expected-state'])
+        ->get(route('amocrm.callback', ['code' => 'test-code', 'state' => 'expected-state']));
+
+    $response->assertRedirect(route('home'));
+    $response->assertSessionHas('error', 'Не удалось подключить amoCRM. Попробуйте ещё раз.');
+});

@@ -6,7 +6,9 @@ use App\Exceptions\AmoAuth\AmoCrmOAuthException;
 use App\Services\AmoCrm\AmoCrmOAuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class AmoCrmOAuthController extends Controller
 {
@@ -42,6 +44,10 @@ class AmoCrmOAuthController extends Controller
             );
         } catch (AmoCrmOAuthException $e) {
             return redirect()->route('home')->with('error', $e->getUserMessage());
+        } catch (Throwable $e) {
+            Log::error('Ошибка подключения amoCRM', ['exception' => $e]);
+
+            return redirect()->route('home')->with('error', 'Не удалось подключить amoCRM. Попробуйте ещё раз.');
         }
 
         return redirect()
