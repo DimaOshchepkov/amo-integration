@@ -29,7 +29,7 @@ class AmoCrmToken extends Model
             'access_token' => $this->access_token,
             'refresh_token' => $this->refresh_token,
             'expires' => $this->expires_at,
-            'baseDomain' => $this->subdomain . '.amocrm.ru',
+            'baseDomain' => $this->subdomain.'.amocrm.ru',
         ]);
     }
 }

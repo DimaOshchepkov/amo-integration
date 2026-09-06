@@ -33,9 +33,10 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function Welcome() {
-    const { auth, errors: pageErrors } = usePage().props as {
+    const { auth, errors: pageErrors, flash } = usePage().props as {
         auth: { user?: unknown };
         errors?: Record<string, string | string[]>
+        flash?: { error?: string | null; success?: string | null };
     };
     const startedAt = useRef<number>(Date.now());
 
@@ -90,6 +91,20 @@ export default function Welcome() {
         <>
             <Head title="Welcome" />
             <div className="flex min-h-screen flex-col items-center bg-background p-6 text-foreground lg:justify-center lg:p-8">
+
+                {flash?.error && (
+                    <Alert variant="destructive" className="mb-4 w-full max-w-md">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{flash.error}</AlertDescription>
+                    </Alert>
+                )}
+
+                {flash?.success && (
+                    <Alert className="mb-4 w-full max-w-md border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertDescription>{flash.success}</AlertDescription>
+                    </Alert>
+                )}
 
                 <Card className="w-full max-w-md shadow-lg">
                     <CardHeader className="text-center">

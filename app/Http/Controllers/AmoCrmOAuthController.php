@@ -2,25 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use AmoCRM\Client\AmoCRMApiClientFactory;
-use AmoCRM\OAuth\OAuthConfigInterface;
-use AmoCRM\OAuth\OAuthServiceInterface;
+use App\Exceptions\AmoAuth\AmoCrmOAuthException;
+use App\Exceptions\AmoAuth\AuthorizationCodeMissingException;
+use App\Exceptions\AmoAuth\InvalidOAuthStateException;
+use App\Exceptions\AmoAuth\TokenExchangeException;
+use App\Services\AmoCrm\AmoCrmOAuthService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
 
 class AmoCrmOAuthController extends Controller
 {
     public function __construct(
-        private readonly OAuthConfigInterface $config,
-        private readonly OAuthServiceInterface $oauthService
+        private readonly AmoCrmOAuthService $oauthService,
     ) {}
 
-    public function connect(Request $request)
+    public function connect(Request $request): RedirectResponse|View
     {
         $existingToken = $this->oauthService->getOAuthToken();
 
         if ($existingToken && ! $existingToken->hasExpired()) {
-            return view('amocrm.already-connected', [
+            return view('already-connected', [
                 'expires' => date('d.m.Y H:i', $existingToken->getExpires()),
             ]);
         }
@@ -28,98 +31,76 @@ class AmoCrmOAuthController extends Controller
         $state = bin2hex(random_bytes(16));
         session(['oauth2state' => $state]);
 
-        $factory = new AmoCRMApiClientFactory($this->config, $this->oauthService);
-        $apiClient = $factory->make();
-
         if ($request->has('button')) {
-            $oauthButton = $apiClient->getOAuthClient()->getOAuthButton([
-                'title' => 'Установить интеграцию',
-                'compact' => true,
-                'class_name' => 'amocrm-oauth-button',
-                'color' => 'default',
-                'error_callback' => 'handleOauthError',
-                'state' => $state,
-            ]);
-
-            return view('amocrm.connect-widget', [
-                'oauthButton' => $oauthButton,
+            return view('connect-widget', [
+                'oauthButton' => $this->oauthService->getOAuthButton([
+                    'title' => 'Установить интеграцию',
+                    'compact' => true,
+                    'class_name' => 'amocrm-oauth-button',
+                    'color' => 'default',
+                    'error_callback' => 'handleOauthError',
+                    'state' => $state,
+                ]),
             ]);
         }
 
-        $authorizationUrl = $apiClient->getOAuthClient()->getAuthorizeUrl([
-            'state' => $state,
-            'mode' => 'post_message',
-        ]);
-
-        return redirect()->away($authorizationUrl);
+        return redirect()->away(
+            $this->oauthService->getAuthorizeUrl(['state' => $state])
+        );
     }
 
-    public function callback(Request $request)
+    public function handleRedirectCallback(Request $request): RedirectResponse
     {
-        $code = $request->input('code');
-        $state = $request->input('state');
-        $referer = $request->input('referer');
-
-        session()->forget('oauth2state');
-        if (empty($state) || $state !== session('oauth2state')) {
-            Log::warning('AmoCRM OAuth: Invalid state', ['state' => $state]);
-
-            return response('Invalid state parameter', 400);
-        }
-
-        if (! $code) {
-            Log::error('AmoCRM OAuth: Code not received');
-
-            return response('Authorization code not received', 400);
-        }
-
         try {
-            $factory = new AmoCRMApiClientFactory($this->config, $this->oauthService);
-            $apiClient = $factory->make();
-
-            if ($referer) {
-                $apiClient->setAccountBaseDomain($referer);
-            }
-
-            $accessToken = $apiClient->getOAuthClient()->getAccessTokenByCode($code);
-
-            if (! $accessToken->hasExpired()) {
-                $ownerDetails = $apiClient->getOAuthClient()->getResourceOwner($accessToken);
-
-                Log::info('AmoCRM OAuth: Успешная авторизация', [
-                    'user' => $ownerDetails->getName(),
-                    'email' => $ownerDetails->getEmail(),
-                ]);
-
-                if ($request->isMethod('post') || $request->has('from_widget')) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Авторизация успешна!',
-                        'user' => $ownerDetails->getName(),
-                    ]);
-                }
-
-                return redirect()
-                    ->route('dashboard')
-                    ->with('success', "AmoCRM успешно подключена! Привет, {$ownerDetails->getName()}!");
-            }
-
-            throw new \Exception('Token has expired immediately after receiving');
-        } catch (\Exception $e) {
-            Log::error('AmoCRM OAuth error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            if ($request->isMethod('post') || $request->has('from_widget')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Ошибка авторизации: '.$e->getMessage(),
-                ], 500);
-            }
-
-            return redirect()
-                ->route('amocrm.connect')
-                ->withErrors(['oauth' => 'Ошибка авторизации: '.$e->getMessage()]);
+            $owner = $this->oauthService->completeCallback(
+                code: $request->query('code'),
+                referer: $request->query('referer'),
+                state: $request->query('state'),
+                fromWidget: $request->has('from_widget'),
+            );
+        } catch (AmoCrmOAuthException $e) {
+            return redirect()->route('home')->with('error', $e->getUserMessage());
         }
+
+        return redirect()
+            ->route('home')
+            ->with('success', "AmoCRM успешно подключена! Привет, {$owner->getName()}!");
+    }
+
+    public function handleWidgetCallback(Request $request): JsonResponse
+    {
+        try {
+            $owner = $this->oauthService->completeCallback(
+                code: $request->input('code'),
+                referer: $request->input('referer'),
+                state: $request->input('state'),
+                fromWidget: $request->has('from_widget'),
+            );
+        } catch (AmoCrmOAuthException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getUserMessage(),
+            ], $this->httpStatus($e));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Авторизация успешна!',
+            'user' => $owner->getName(),
+        ]);
+    }
+
+    /**
+     * HTTP-статус для доменного исключения — маппинг живёт в HTTP-слое,
+     * сами исключения про HTTP ничего не знают.
+     */
+    private function httpStatus(AmoCrmOAuthException $e): int
+    {
+        return match (true) {
+            $e instanceof InvalidOAuthStateException,
+            $e instanceof AuthorizationCodeMissingException => 400,
+            $e instanceof TokenExchangeException => 502,
+            default => 500,
+        };
     }
 }
