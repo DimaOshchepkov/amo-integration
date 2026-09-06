@@ -6,6 +6,7 @@ use AmoCRM\Client\AmoCRMApiClient;
 use AmoCRM\Client\AmoCRMApiClientFactory;
 use AmoCRM\OAuth\OAuthConfigInterface;
 use App\Exceptions\AmoAuth\AmoCrmNotAuthorizedException;
+use League\OAuth2\Client\Token\AccessToken;
 
 class AmoCrmService
 {
@@ -27,13 +28,20 @@ class AmoCrmService
             return $this->client;
         }
 
-        if ($this->oauthService->getOAuthToken() === null) {
+        $token = $this->oauthService->getOAuthToken();
+
+        if ($token === null) {
             throw new AmoCrmNotAuthorizedException;
         }
 
-        $factory = new AmoCRMApiClientFactory($this->config, $this->oauthService);
-        $this->client = $factory->make();
+        /** @var AccessToken $token */
+        $client = (new AmoCRMApiClientFactory($this->config, $this->oauthService))->make();
 
-        return $this->client;
+        $client->setAccessToken($token)
+            ->setAccountBaseDomain(
+                (string) ($token->getValues()['baseDomain'] ?? config('services.amocrm.subdomain').'.amocrm.ru')
+            );
+
+        return $this->client = $client;
     }
 }

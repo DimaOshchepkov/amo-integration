@@ -66,6 +66,7 @@ class AmoCrmOAuthService implements OAuthServiceInterface
     /**
      * Завершает OAuth-колбэк: проверяет state, обменивает код на токен,
      * сохраняет токен и возвращает владельца аккаунта.
+     *
      * @throws AuthorizationCodeMissingException
      * @throws TokenExchangeException
      * @throws InvalidOAuthStateException
