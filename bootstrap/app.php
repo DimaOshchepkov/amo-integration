@@ -21,9 +21,6 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
         $middleware->trustProxies(at: '*');
-
-        // POST виджета amoCRM не несёт CSRF-токен — без исключения он падает с 419.
-        $middleware->validateCsrfTokens(except: ['amocrm/callback']);
     })
     ->withExceptions()
     ->create();

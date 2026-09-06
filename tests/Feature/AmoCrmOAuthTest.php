@@ -6,7 +6,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use League\OAuth2\Client\Token\AccessToken;
 
 use function Pest\Laravel\get;
-use function Pest\Laravel\post;
 
 uses(RefreshDatabase::class);
 
@@ -28,13 +27,6 @@ test('connect redirects to authorize url and stores state when no token exists',
 
     $response->assertRedirect();
     $response->assertSessionHas('oauth2state');
-});
-
-test('connect with button renders widget view', function () {
-    $response = get(route('amocrm.connect', ['button' => 1]));
-
-    $response->assertOk();
-    $response->assertViewIs('connect-widget');
 });
 
 test('redirect callback completes oauth and redirects home with success flash', function () {
@@ -71,60 +63,4 @@ test('redirect callback without code redirects home with error flash', function 
 
     $response->assertRedirect(route('home'));
     $response->assertSessionHas('error', 'Код авторизации не получен');
-});
-
-test('widget callback failure returns json without accept header', function () {
-    $oauthClient = Mockery::mock(AmoCRMOAuth::class);
-    $oauthClient->shouldReceive('setBaseDomain')
-        ->once()
-        ->with('widget.amocrm.ru')
-        ->andReturnSelf();
-    $oauthClient->shouldReceive('getAccessTokenByCode')
-        ->once()
-        ->with('test-code')
-        ->andThrow(new Exception('boom'));
-
-    $this->instance(AmoCRMOAuth::class, $oauthClient);
-
-    $response = post(route('amocrm.callback.widget'), [
-        'code' => 'test-code',
-        'referer' => 'widget.amocrm.ru',
-        'from_widget' => 1,
-    ]);
-
-    $response->assertStatus(502);
-    $response->assertHeader('Content-Type', 'application/json');
-    $response->assertJson([
-        'success' => false,
-        'error' => 'Не удалось получить токен доступа',
-    ]);
-});
-
-test('widget callback completes oauth without session state', function () {
-    $oauthClient = Mockery::mock(AmoCRMOAuth::class);
-    $oauthClient->shouldReceive('setBaseDomain')
-        ->once()
-        ->with('widget.amocrm.ru')
-        ->andReturnSelf();
-    $oauthClient->shouldReceive('getAccessTokenByCode')
-        ->once()
-        ->with('test-code')
-        ->andReturn(validAccessToken());
-    $oauthClient->shouldReceive('getResourceOwner')
-        ->once()
-        ->andReturn(new AmoCRMResourceOwner(['id' => 1, 'name' => 'Иван']));
-
-    $this->instance(AmoCRMOAuth::class, $oauthClient);
-
-    $response = post(route('amocrm.callback.widget'), [
-        'code' => 'test-code',
-        'referer' => 'widget.amocrm.ru',
-        'from_widget' => 1,
-    ]);
-
-    $response->assertJson([
-        'success' => true,
-        'user' => 'Иван',
-    ]);
-    $this->assertDatabaseHas('amo_crm_tokens', ['subdomain' => 'widget']);
 });

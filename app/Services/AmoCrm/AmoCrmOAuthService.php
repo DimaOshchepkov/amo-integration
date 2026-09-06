@@ -63,12 +63,6 @@ class AmoCrmOAuthService implements OAuthServiceInterface
         return $this->oauthClient()->getAuthorizeUrl($options);
     }
 
-    /** @param array<string, mixed> $options */
-    public function getOAuthButton(array $options = []): string
-    {
-        return $this->oauthClient()->getOAuthButton($options);
-    }
-
     /**
      * Завершает OAuth-колбэк: проверяет state, обменивает код на токен,
      * сохраняет токен и возвращает владельца аккаунта.
@@ -77,9 +71,16 @@ class AmoCrmOAuthService implements OAuthServiceInterface
         ?string $code,
         ?string $referer,
         ?string $state,
-        bool $fromWidget,
     ): AmoCRMResourceOwner {
-        $this->verifyState($state, $fromWidget);
+        $sessionState = session('oauth2state');
+
+        if (empty($state) || empty($sessionState) || $state !== $sessionState) {
+            session()->forget('oauth2state');
+
+            throw new InvalidOAuthStateException('State mismatch');
+        }
+
+        session()->forget('oauth2state');
 
         if (! $code) {
             throw new AuthorizationCodeMissingException('Code is empty');
@@ -91,23 +92,6 @@ class AmoCrmOAuthService implements OAuthServiceInterface
         $owner = $this->oauthClient()->getResourceOwner($accessToken);
 
         return $owner;
-    }
-
-    private function verifyState(?string $state, bool $fromWidget): void
-    {
-        if ($fromWidget) {
-            return;
-        }
-
-        $sessionState = session('oauth2state');
-
-        if (empty($state) || empty($sessionState) || $state !== $sessionState) {
-            session()->forget('oauth2state');
-
-            throw new InvalidOAuthStateException('State mismatch');
-        }
-
-        session()->forget('oauth2state');
     }
 
     private function exchangeCodeForToken(string $code, ?string $referer): AccessTokenInterface
