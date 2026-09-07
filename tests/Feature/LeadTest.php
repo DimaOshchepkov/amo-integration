@@ -13,7 +13,7 @@ function validLeadPayload(array $overrides = []): array
     return array_merge([
         'name' => 'Иван Иванов',
         'email' => 'ivan@example.com',
-        'phone' => '+79991234567',
+        'phone' => '8 (999) 123-45-67',
         'price' => '1500.50',
         'spent_more_than_30_seconds' => true,
     ], $overrides);
@@ -72,6 +72,7 @@ test('store validates form fields', function (array $payload, array $failedField
     'invalid email' => [validLeadPayload(['email' => 'not-an-email']), ['email']],
     'short name' => [validLeadPayload(['name' => 'Я']), ['name']],
     'short phone' => [validLeadPayload(['phone' => '123']), ['phone']],
+    'garbage phone' => [validLeadPayload(['phone' => 'abc']), ['phone']],
     'non-numeric price' => [validLeadPayload(['price' => 'abc']), ['price']],
     'non-positive price' => [validLeadPayload(['price' => '0']), ['price']],
     'missing 30s flag' => [validLeadPayload(['spent_more_than_30_seconds' => null]), ['spent_more_than_30_seconds']],

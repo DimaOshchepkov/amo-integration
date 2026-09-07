@@ -5,6 +5,7 @@ import { z } from 'zod';
 import React, { useEffect, useRef } from 'react';
 
 import { store as leadStore } from '@/routes/lead';
+import { formatPhoneInput, normalizePhone } from '@/lib/phone';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,11 @@ import {
 const schema = z.object({
     name: z.string().min(2, 'Минимум 2 символа'),
     email: z.string().min(1, 'Введите email').email('Некорректный email'),
-    phone: z.string().min(5, 'Введите телефон'),
+    phone: z
+        .string()
+        .min(1, 'Введите телефон')
+        .transform(normalizePhone)
+        .refine((value) => /^\+7\d{10}$/.test(value), 'Введите телефон'),
     price: z
         .string()
         .min(1, 'Введите цену')
@@ -44,11 +49,13 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+interface PageProps {
+    errors?: Record<string, string | string[]>;
+    flash?: { error?: string | null; success?: string | null };
+}
+
 export default function Welcome() {
-    const { errors: pageErrors, flash } = usePage().props as {
-        errors?: Record<string, string | string[]>;
-        flash?: { error?: string | null; success?: string | null };
-    };
+    const { errors: pageErrors, flash } = usePage<PageProps>().props;
     const startedAt = useRef<number>(Date.now());
 
     const {
@@ -83,8 +90,10 @@ export default function Welcome() {
             { ...data, spent_more_than_30_seconds: spentMoreThan30s },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    reset();
+                onSuccess: (page: { props: PageProps }) => {
+                    if (page.props.flash?.success) {
+                        reset();
+                    }
                 },
             },
         );
@@ -164,7 +173,14 @@ export default function Welcome() {
                                     <Input
                                         type="tel"
                                         placeholder="+7 (999) 123-45-67"
-                                        {...register('phone')}
+                                        {...register('phone', {
+                                            onChange: (event) => {
+                                                event.target.value =
+                                                    formatPhoneInput(
+                                                        event.target.value,
+                                                    );
+                                            },
+                                        })}
                                     />
                                 }
                             />
