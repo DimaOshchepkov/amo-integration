@@ -26,7 +26,7 @@ npm run dev
 
 ## Демо
 
-[Смотреть демо](public/videos/demo-amo.mp4)
+[Смотреть демо](public/videos/demo-amo.gif)
 
 ## Git
 
